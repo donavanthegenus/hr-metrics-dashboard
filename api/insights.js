@@ -51,7 +51,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data } = req.body;
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { data } = body;
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
