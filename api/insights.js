@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+export const config = { runtime: 'edge' };
+
 const SYSTEM_PROMPT = `You are an expert HR analytics consultant with 20 years of experience in workforce strategy, talent management, and people analytics.
 
 When given HR data, respond with a valid JSON object (no markdown, no extra text) containing TWO complete analyses of the same data for different audiences:
@@ -37,22 +39,26 @@ When given HR data, respond with a valid JSON object (no markdown, no extra text
 
 Provide exactly 4 insights and 3 recommendations in each section. For terminology: include 4-5 terms per section that are most relevant to the specific findings in that analysis — terms that actually appear or are implied in your insights and recommendations. Plain English terms should be the kind a manager might vaguely know but appreciate having clearly defined. HR Professional terms should be the more technical ones used in that section. The two sections can share some terms but should each define them for their own audience. Be specific and data-driven in both.`;
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
+export default async function handler(req) {
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { data } = body;
+    const { data } = await req.json();
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -92,11 +98,19 @@ Active Filters: Date Range = ${data.dateRange}, Department = ${data.department}`
 
     const rawText = response.content[0].text.trim();
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: rawText, insights: [], recommendations: [] };
+    const parsed = jsonMatch
+      ? JSON.parse(jsonMatch[0])
+      : { summary: rawText, insights: [], recommendations: [] };
 
-    res.json({ insights: parsed });
+    return new Response(JSON.stringify({ insights: parsed }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (err) {
     console.error('Insights error:', err.message);
-    res.status(500).json({ error: err.message || 'Failed to generate insights' });
+    return new Response(JSON.stringify({ error: err.message || 'Failed to generate insights' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 }
