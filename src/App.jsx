@@ -7,6 +7,7 @@ import { TurnoverChart, HeadcountChart, SatisfactionChart } from './components/C
 import AIInsightsPanel from './components/AIInsightsPanel';
 import { KPI_CONFIGS, getFilteredData } from './data/sampleData';
 import InfoTooltip from './components/InfoTooltip';
+import { getAIInsights } from './lib/aiInsights';
 
 const s = {
   app: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#080c14' },
@@ -87,20 +88,13 @@ export default function App() {
     setShowInsights(true);
     setAiInsights(null);
     try {
-      const res = await fetch('/api/insights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { kpis, turnoverData, headcountData, satisfactionData, dateRange, department } }),
-      });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const { insights, error } = await res.json();
-      if (error) throw new Error(error);
+      const insights = await getAIInsights({ kpis, turnoverData, headcountData, satisfactionData, dateRange, department });
       setAiInsights(insights);
     } catch (err) {
       setAiInsights({
         riskLevel: 'moderate',
         riskReason: 'Could not connect to AI service.',
-        summary: `Error: ${err.message}. Ensure ANTHROPIC_API_KEY is set and the API server is running (npm run server or npm run dev).`,
+        summary: `Error: ${err.message}. Ensure VITE_ANTHROPIC_API_KEY is set in your environment.`,
         insights: [],
         recommendations: [],
       });

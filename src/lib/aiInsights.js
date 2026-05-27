@@ -1,7 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-export const config = { runtime: 'edge' };
-
 const SYSTEM_PROMPT = `You are an expert HR analytics consultant with 20 years of experience in workforce strategy, talent management, and people analytics.
 
 When given HR data, respond with a valid JSON object (no markdown, no extra text) containing TWO complete analyses of the same data for different audiences:
@@ -39,78 +37,49 @@ When given HR data, respond with a valid JSON object (no markdown, no extra text
 
 Provide exactly 4 insights and 3 recommendations in each section. For terminology: include 4-5 terms per section that are most relevant to the specific findings in that analysis — terms that actually appear or are implied in your insights and recommendations. Plain English terms should be the kind a manager might vaguely know but appreciate having clearly defined. HR Professional terms should be the more technical ones used in that section. The two sections can share some terms but should each define them for their own audience. Be specific and data-driven in both.`;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+const anthropic = new Anthropic({
+  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  try {
-    const { data } = await req.json();
-
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const userMessage = `Analyze this HR dashboard data and provide insights:
+export async function getAIInsights({ kpis, turnoverData, headcountData, satisfactionData, dateRange, department }) {
+  const userMessage = `Analyze this HR dashboard data and provide insights:
 
 KPI Metrics:
-- Turnover Rate: ${data.kpis.turnoverRate.value}% (previous: ${data.kpis.turnoverRate.previous}%)
-- Time to Fill: ${data.kpis.timeToFill.value} days (previous: ${data.kpis.timeToFill.previous} days)
-- Total Headcount: ${data.kpis.headcount.value} (previous: ${data.kpis.headcount.previous})
-- Absenteeism Rate: ${data.kpis.absenteeismRate.value}% (previous: ${data.kpis.absenteeismRate.previous}%)
-- Offer Acceptance Rate: ${data.kpis.offerAcceptanceRate.value}% (previous: ${data.kpis.offerAcceptanceRate.previous}%)
-- Retention Rate: ${data.kpis.retentionRate.value}% (previous: ${data.kpis.retentionRate.previous}%)
+- Turnover Rate: ${kpis.turnoverRate.value}% (previous: ${kpis.turnoverRate.previous}%)
+- Time to Fill: ${kpis.timeToFill.value} days (previous: ${kpis.timeToFill.previous} days)
+- Total Headcount: ${kpis.headcount.value} (previous: ${kpis.headcount.previous})
+- Absenteeism Rate: ${kpis.absenteeismRate.value}% (previous: ${kpis.absenteeismRate.previous}%)
+- Offer Acceptance Rate: ${kpis.offerAcceptanceRate.value}% (previous: ${kpis.offerAcceptanceRate.previous}%)
+- Retention Rate: ${kpis.retentionRate.value}% (previous: ${kpis.retentionRate.previous}%)
 
-Turnover Trend (last ${data.turnoverData.length} months):
-${data.turnoverData.map(d => `${d.month}: ${d.rate}%`).join(', ')}
+Turnover Trend (last ${turnoverData.length} months):
+${turnoverData.map(d => `${d.month}: ${d.rate}%`).join(', ')}
 
 Headcount by Department:
-${data.headcountData.map(d => `${d.department}: ${d.count} (${d.change >= 0 ? '+' : ''}${d.change})`).join(', ')}
+${headcountData.map(d => `${d.department}: ${d.count} (${d.change >= 0 ? '+' : ''}${d.change})`).join(', ')}
 
-Satisfaction Scores (last ${data.satisfactionData.length} months):
-${data.satisfactionData.map(d => `${d.month}: ${d.score}/10 (eNPS: ${d.eNPS})`).join(', ')}
+Satisfaction Scores (last ${satisfactionData.length} months):
+${satisfactionData.map(d => `${d.month}: ${d.score}/10 (eNPS: ${d.eNPS})`).join(', ')}
 
-Active Filters: Date Range = ${data.dateRange}, Department = ${data.department}`;
+Active Filters: Date Range = ${dateRange}, Department = ${department}`;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: [
-        {
-          type: 'text',
-          text: SYSTEM_PROMPT,
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages: [{ role: 'user', content: userMessage }],
-    });
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    system: [
+      {
+        type: 'text',
+        text: SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    messages: [{ role: 'user', content: userMessage }],
+  });
 
-    const rawText = response.content[0].text.trim();
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch
-      ? JSON.parse(jsonMatch[0])
-      : { summary: rawText, insights: [], recommendations: [] };
-
-    return new Response(JSON.stringify({ insights: parsed }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (err) {
-    console.error('Insights error:', err.message);
-    return new Response(JSON.stringify({ error: err.message || 'Failed to generate insights' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  const rawText = response.content[0].text.trim();
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  return jsonMatch
+    ? JSON.parse(jsonMatch[0])
+    : { summary: rawText, insights: [], recommendations: [] };
 }
