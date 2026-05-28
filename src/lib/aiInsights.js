@@ -37,8 +37,11 @@ When given HR data, respond with a valid JSON object (no markdown, no extra text
 
 Provide exactly 4 insights and 3 recommendations in each section. For terminology: include 4-5 terms per section that are most relevant to the specific findings in that analysis — terms that actually appear or are implied in your insights and recommendations. Plain English terms should be the kind a manager might vaguely know but appreciate having clearly defined. HR Professional terms should be the more technical ones used in that section. The two sections can share some terms but should each define them for their own audience. Be specific and data-driven in both.`;
 
+const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+console.log('[AI Insights] API key present:', !!apiKey, '| length:', apiKey?.length ?? 0);
+
 const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+  apiKey,
   dangerouslyAllowBrowser: true,
 });
 
