@@ -4,10 +4,8 @@ import Header from './components/Header';
 import Filters from './components/Filters';
 import KPICard from './components/KPICard';
 import { TurnoverChart, HeadcountChart, SatisfactionChart } from './components/Charts';
-import AIInsightsPanel from './components/AIInsightsPanel';
 import { KPI_CONFIGS, getFilteredData } from './data/sampleData';
 import InfoTooltip from './components/InfoTooltip';
-import { getAIInsights } from './lib/aiInsights';
 
 const s = {
   app: { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#080c14' },
@@ -59,7 +57,6 @@ const s = {
     border: 'none', transition: 'all 0.2s',
     fontFamily: 'Inter, sans-serif',
   },
-  insightsPanel: { marginTop: 16 },
 };
 
 function SpinnerIcon() {
@@ -75,33 +72,10 @@ function SpinnerIcon() {
 export default function App() {
   const [dateRange, setDateRange] = useState('year');
   const [department, setDepartment] = useState('All');
-  const [aiInsights, setAiInsights] = useState(null);
-  const [loadingInsights, setLoadingInsights] = useState(false);
-  const [showInsights, setShowInsights] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const dashboardRef = useRef(null);
 
   const { kpis, turnoverData, headcountData, satisfactionData } = getFilteredData(dateRange, department);
-
-  const handleGetInsights = async () => {
-    setLoadingInsights(true);
-    setShowInsights(true);
-    setAiInsights(null);
-    try {
-      const insights = await getAIInsights({ kpis, turnoverData, headcountData, satisfactionData, dateRange, department });
-      setAiInsights(insights);
-    } catch (err) {
-      setAiInsights({
-        riskLevel: 'moderate',
-        riskReason: 'Could not connect to AI service.',
-        summary: `Error: ${err.message}. Ensure VITE_ANTHROPIC_API_KEY is set in your environment.`,
-        insights: [],
-        recommendations: [],
-      });
-    } finally {
-      setLoadingInsights(false);
-    }
-  };
 
   const handleExportPDF = async () => {
     setExportingPDF(true);
@@ -216,29 +190,6 @@ export default function App() {
           <button
             style={{
               ...s.btnBase,
-              background: loadingInsights
-                ? 'rgba(59,130,246,0.5)'
-                : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-              color: 'white',
-              boxShadow: loadingInsights ? 'none' : '0 4px 20px rgba(59,130,246,0.35)',
-            }}
-            onClick={handleGetInsights}
-            disabled={loadingInsights}
-            onMouseEnter={e => { if (!loadingInsights) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-          >
-            {loadingInsights ? <SpinnerIcon /> : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                  stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-            {loadingInsights ? 'Analyzing with Claude…' : 'AI Insights'}
-          </button>
-
-          <button
-            style={{
-              ...s.btnBase,
               background: 'rgba(148,163,184,0.06)',
               border: '1px solid rgba(148,163,184,0.14)',
               color: '#94a3b8',
@@ -256,38 +207,7 @@ export default function App() {
             )}
             {exportingPDF ? 'Exporting…' : 'Export PDF'}
           </button>
-
-          {showInsights && (
-            <button
-              style={{
-                ...s.btnBase,
-                background: 'transparent',
-                border: '1px solid rgba(148,163,184,0.1)',
-                color: '#475569',
-                marginLeft: 'auto',
-              }}
-              onClick={() => setShowInsights(false)}
-              onMouseEnter={e => { e.currentTarget.style.color = '#94a3b8'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#475569'; }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              Dismiss
-            </button>
-          )}
         </div>
-
-        {/* AI Insights Panel */}
-        {showInsights && (
-          <div style={s.insightsPanel}>
-            <AIInsightsPanel
-              insights={aiInsights}
-              loading={loadingInsights}
-              onClose={() => setShowInsights(false)}
-            />
-          </div>
-        )}
 
         {/* Footer */}
         <div style={{ marginTop: 40, paddingTop: 20, borderTop: '1px solid rgba(148,163,184,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
